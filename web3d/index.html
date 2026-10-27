@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Nautilus D-NAS | 3D Marine Swarm & UGREEN AI NAS Command Center</title>
+  
+  <!-- Fonts & Icons -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;600;700&family=Plus+Jakarta+Sans:wght@300;400;600;700;800&display=swap" rel="stylesheet">
+  
+  <!-- Three.js & Controls from CDN -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/tween.js/18.6.4/tween.umd.js"></script>
+
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <!-- 3D WebGL Canvas Container -->
+  <div id="canvas-container"></div>
+
+  <!-- Cyber-Marine Glassmorphism HUD Overlay -->
+  <div id="hud-overlay">
+    
+    <!-- Top Header Bar -->
+    <header class="top-nav">
+      <div class="brand">
+        <div class="pulse-indicator online"></div>
+        <div class="brand-text">
+          <span class="title">NAUTILUS <span class="highlight">D-NAS</span></span>
+          <span class="subtitle">Decentralized Marine Drone Swarm Storage | UGREEN AI NAS</span>
+        </div>
+      </div>
+
+      <!-- Quick Platform & Status Pill -->
+      <div class="system-status-pills">
+        <div class="status-pill platform">
+          <span class="pill-label">PLATFORM</span>
+          <span class="pill-val">UGOS Pro (iDX6011 Pro)</span>
+        </div>
+        <div class="status-pill engine">
+          <span class="pill-label">CODEC</span>
+          <span class="pill-val">Reed-Solomon GF(2⁸)</span>
+        </div>
+        <div class="status-pill swarm">
+          <span class="pill-label">SWARM FLEET</span>
+          <span class="pill-val" id="hud-fleet-status">10 / 10 ONLINE</span>
+        </div>
+      </div>
+
+      <!-- Action Buttons -->
+      <div class="top-actions">
+        <button id="btn-reset-scene" class="hud-btn secondary" title="Reset Swarm to initial patrol">⟳ Reset Swarm</button>
+        <button id="btn-view-docs" class="hud-btn secondary" onclick="window.open('/docs', '_blank')">API Docs</button>
+      </div>
+    </header>
+
+    <!-- Main Workspace Split -->
+    <main class="hud-main">
+      
+      <!-- Left Panel: Swarm Topology & Erasure Coding Controls -->
+      <aside class="panel left-panel">
+        <div class="panel-header">
+          <span class="panel-icon">⚡</span>
+          <h3>Swarm Storage Mesh & Fault Injection</h3>
+        </div>
+
+        <div class="panel-body">
+          <!-- Swarm Reliability Gauge -->
+          <div class="metric-card">
+            <div class="metric-header">
+              <span>Swarm Resilience (R<sub>swarm</sub>)</span>
+              <span id="r-swarm-val" class="highlight-val">95.0%</span>
+            </div>
+            <div class="progress-bar-bg">
+              <div id="r-swarm-bar" class="progress-bar-fill" style="width: 95%;"></div>
+            </div>
+            <div class="metric-subtext">Single Drone Survival: 70.0% | RS Gain: +25.0%</div>
+          </div>
+
+          <!-- Parameter Summary -->
+          <div class="rs-parameters-grid">
+            <div class="param-box">
+              <span class="param-num" id="val-k">6</span>
+              <span class="param-tag">Data Shards (k)</span>
+            </div>
+            <div class="param-box">
+              <span class="param-num" id="val-m">4</span>
+              <span class="param-tag">Parity Shards (m)</span>
+            </div>
+            <div class="param-box">
+              <span class="param-num" id="val-n">10</span>
+              <span class="param-tag">Total Drones (n)</span>
+            </div>
+          </div>
+
+          <!-- Interactive Drone Mesh Matrix -->
+          <div class="drone-matrix-container">
+            <div class="section-label">Fleet Grid (Click drone to inspect or sink)</div>
+            <div class="drone-grid" id="drone-grid">
+              <!-- Rendered via JS -->
+            </div>
+          </div>
+
+          <!-- Fault Simulation Controls -->
+          <div class="simulation-controls">
+            <div class="section-label">Simulate Harsh Marine Conditions</div>
+            <div class="btn-group-row">
+              <button id="btn-sink-random" class="hud-btn danger-outline">
+                <span class="icon">⚓</span> Sink Drones (-2)
+              </button>
+              <button id="btn-bitrot-random" class="hud-btn warning-outline">
+                <span class="icon">⚠️</span> Inject Bit-Rot
+              </button>
+            </div>
+            <button id="btn-sink-max" class="hud-btn danger-solid" title="Simulate losing 4 drones (maximum fault tolerance m=4)">
+              💥 Sink Max Safe Drones (4/10 Lost)
+            </button>
+          </div>
+
+          <!-- Primary Reconstruction Trigger Button -->
+          <div class="action-cta-box">
+            <button id="btn-run-pipeline" class="hud-btn primary-glow">
+              <span class="btn-spinner" id="pipeline-spinner" style="display:none;"></span>
+              <span class="btn-text">🚀 RUN NAUTILUS D-NAS RECOVERY</span>
+            </button>
+            <div class="cta-note">Orchestrated by Uliya AI Skill (100% Offline UGOS Pro)</div>
+          </div>
+        </div>
+      </aside>
+
+      <!-- Center Floating Camera Toolbar -->
+      <nav class="camera-toolbar">
+        <button class="cam-btn active" data-view="orbit" title="Orbital 360° Free View">🌐 Orbital</button>
+        <button class="cam-btn" data-view="vessel" title="Mother Vessel & UGREEN AI NAS Deck">🚢 UGREEN NAS</button>
+        <button class="cam-btn" data-view="chase" title="AUV-01 Cockpit Chase View">🐬 Drone Follow</button>
+        <button class="cam-btn" data-view="pipeline" title="Subsea Pipeline Crack Anomaly View">🔍 Pipeline Crack</button>
+      </nav>
+
+      <!-- Right Panel: Live Terminal Logs & AI Anomaly Intelligence -->
+      <aside class="panel right-panel">
+        <div class="panel-header">
+          <span class="panel-icon">🤖</span>
+          <h3>UGREEN AI Knowledge Hub & Real-time Logs</h3>
+        </div>
+
+        <div class="panel-body">
+          <!-- Shard Integrity Inventory Status -->
+          <div class="shard-inventory-card">
+            <div class="inventory-status-row">
+              <span class="label">Reconstruction Status:</span>
+              <span id="reconstruction-badge" class="badge ready">READY FOR INGESTION</span>
+            </div>
+            <div class="inventory-breakdown">
+              <div>Valid Shards: <strong id="inv-valid">10/10</strong></div>
+              <div>Lost/Sunken: <strong id="inv-lost" class="text-danger">0</strong></div>
+              <div>Quarantined: <strong id="inv-corrupt" class="text-warning">0</strong></div>
+            </div>
+          </div>
+
+          <!-- AI Multimodal Anomaly Detection Card -->
+          <div class="anomaly-card" id="anomaly-card">
+            <div class="anomaly-card-header">
+              <span class="anomaly-badge critical">CRITICAL ANOMALY DETECTED</span>
+              <span class="confidence">96.4% Conf</span>
+            </div>
+            <div class="anomaly-title">Subsea Pipeline Hairline Micro-Fracture</div>
+            <div class="anomaly-details">
+              <div>📍 <strong>Coordinates:</strong> -8.4521, 115.1245 (Depth: 872.4m)</div>
+              <div>🔍 <strong>Sensor:</strong> High-Frequency Synthetic Aperture Sonar (SAS)</div>
+              <div>🛡️ <strong>Action:</strong> Dispatch ROV for ultrasonic clamp installation</div>
+            </div>
+          </div>
+
+          <!-- Live Real-Time Terminal Output Console -->
+          <div class="terminal-container">
+            <div class="terminal-top">
+              <span class="dot red"></span>
+              <span class="dot yellow"></span>
+              <span class="dot green"></span>
+              <span class="terminal-title">nautilus-dnas-sync.log</span>
+            </div>
+            <div class="terminal-body" id="terminal-body">
+              <div class="log-line info">[SYS] Nautilus D-NAS Edge Storage Engine initialized.</div>
+              <div class="log-line info">[SYS] Support Vessel anchored at Deep-Sea Segment Bravo-7.</div>
+              <div class="log-line success">[RS] Vandermonde generator matrix G loaded over GF(2⁸).</div>
+              <div class="log-line success">[MESH] 10 AUV nodes broadcasting optical/acoustic heartbeats.</div>
+            </div>
+          </div>
+        </div>
+      </aside>
+
+    </main>
+
+    <!-- Selected Drone Telemetry Modal Drawer -->
+    <div id="drone-inspector-modal" class="inspector-modal" style="display: none;">
+      <div class="modal-card">
+        <div class="modal-header">
+          <div class="drone-title-group">
+            <span class="drone-icon">🐬</span>
+            <div>
+              <h4 id="inspect-drone-id">AUV-01</h4>
+              <span id="inspect-drone-role" class="badge data">DATA SHARD (D0)</span>
+            </div>
+          </div>
+          <button class="close-modal" id="btn-close-modal">✕</button>
+        </div>
+        <div class="modal-body">
+          <div class="telemetry-grid">
+            <div class="tel-item"><span class="lbl">Status:</span><span class="val" id="inspect-status">ONLINE</span></div>
+            <div class="tel-item"><span class="lbl">Depth:</span><span class="val" id="inspect-depth">845.2 m</span></div>
+            <div class="tel-item"><span class="lbl">Battery:</span><span class="val" id="inspect-battery">97.8%</span></div>
+            <div class="tel-item"><span class="lbl">Acoustic SNR:</span><span class="val" id="inspect-snr">18.4 dB</span></div>
+            <div class="tel-item full"><span class="lbl">Shard SHA-256:</span><span class="val font-mono" id="inspect-hash">e3b0c442...</span></div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button id="btn-toggle-drone-sink" class="hud-btn danger-solid">Sink / Kill Drone</button>
+          <button id="btn-toggle-drone-corrupt" class="hud-btn warning-solid">Corrupt Shard (Bit-Rot)</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Bottom Mission Ticker Bar -->
+    <footer class="bottom-bar">
+      <div class="ticker-item"><strong>Mission:</strong> <code>SUBSEA-2026-ALPHA</code></div>
+      <div class="ticker-item"><strong>Mathematical Fault-Tolerance:</strong> \(m = 4\) parity shards (guarantees 100% recovery for \(\le 4\) drone losses)</div>
+      <div class="ticker-item author">Built for UGREEN Hackathon on AI NAS by <strong>Diky Dwi Anggara Permadi</strong> & <strong>Dzaky Zahy Rabbani</strong></div>
+    </footer>
+
+  </div>
+
+  <script src="nautilus_3d.js"></script>
+</body>
+</html>

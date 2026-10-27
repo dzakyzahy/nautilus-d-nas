@@ -70,6 +70,27 @@ $$\sum_{i=0}^{4} \binom{10}{i} (0.3)^i (0.7)^{10-i} \approx 85.0\% \xrightarrow{
 
 ---
 
+## 🌐 3D Interactive Marine Swarm & UGREEN NAS Visualizer
+
+Nautilus D-NAS includes a **production-ready 3D Virtual Ocean & Swarm Command Center** built with WebGL / Three.js:
+
+- **Surface Mother Vessel & UGREEN NAS Rack:** Shows the shipboard research vessel with the physical UGREEN AI NAS iDX6011 Pro storage rack, data activity LEDs, and rotating radar.
+- **10 Autonomous Underwater Vehicles (AUVs):** 
+  - AUV-01 .. AUV-06 carrying **Data Shards ($D_0 \dots D_5$)** with cyan beacons.
+  - AUV-07 .. AUV-10 carrying **Parity Shards ($P_0 \dots P_3$)** with purple beacons.
+  - Dynamic peer-to-peer acoustic mesh links pulsing in real-time.
+- **Subsea Pipeline Anomaly Site:** Deep-sea pipeline at 872m depth with a marked hairline micro-fracture flaw pulsing red.
+- **Interactive Fault Injection & Recovery:**
+  - **Sink Drones:** Watch drones lose propulsion, turn red, and plunge into the abyss.
+  - **Inject Bit-Rot:** Simulates acoustic packet distortion (turns amber).
+  - **Run Nautilus D-NAS Recovery:** Live 3-phase visual sequence:
+    1. *Phase 1:* Acoustic upload laser beams to UGREEN NAS; corrupt shards quarantined.
+    2. *Phase 2:* 3D rotating holographic $GF(2^8)$ matrix displays the $G_{\text{sub}}^{-1} \cdot S_{\text{sub}}$ inversion.
+    3. *Phase 3:* Green sonar wavefront sweeps down to the pipeline, locking onto the crack and triggering the UGREEN AI Knowledge Hub report!
+- **How to view:** Run `uvicorn api_server:app --port 8000` and open **`http://localhost:8000/3d/`** or simply double-click `web3d/index.html`!
+
+---
+
 ## 🗂️ Repository Directory Structure
 
 ```text

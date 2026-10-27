@@ -8,8 +8,10 @@ import asyncio
 import json
 import os
 from typing import Dict, List, Optional
-from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect, Query
+from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel, Field
 
 from nautilus_rs_codec.decoder import decode_mission, InsufficientShardsError
@@ -110,18 +112,38 @@ class FullPipelineRequest(BaseModel):
 
 
 # ---------------------------------------------------------------------------
-# API Endpoints
+# API Endpoints & 3D Web Visualizer
 # ---------------------------------------------------------------------------
 @app.get("/")
-def root():
+def root(request: Request):
+    accept = request.headers.get("accept", "")
+    if "text/html" in accept and os.path.exists("web3d/index.html"):
+        return FileResponse("web3d/index.html")
     return {
         "system": "Nautilus D-NAS",
         "role": "Marine Drone Swarm Mesh Storage Engine",
         "platform": "UGREEN AI NAS (UGOS Pro / iDX6011 Pro)",
         "status": "ONLINE",
+        "web_3d_visualizer": "/3d/",
         "docs_url": "/docs",
     }
 
+
+# Mount 3D Visualizer Static Assets
+if os.path.exists("web3d"):
+    app.mount("/3d", StaticFiles(directory="web3d", html=True), name="web3d")
+    # Also mount static assets for root HTML resolution
+    app.mount("/static", StaticFiles(directory="web3d"), name="static")
+
+
+
+@app.get("/style.css")
+def get_root_css():
+    return FileResponse("web3d/style.css")
+
+@app.get("/nautilus_3d.js")
+def get_root_js():
+    return FileResponse("web3d/nautilus_3d.js")
 
 @app.get("/api/health")
 def health_check():
