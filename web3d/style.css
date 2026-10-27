@@ -204,10 +204,10 @@ body, html {
 }
 
 .panel-body {
-  padding: 16px;
+  padding: 12px;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 10px;
 }
 
 /* Metric Cards */
@@ -582,7 +582,7 @@ body, html {
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  height: 220px;
+  height: 180px;
 }
 
 .terminal-top {
@@ -763,7 +763,7 @@ body, html {
 
 .shard-audit-table-wrap {
   overflow-x: auto;
-  max-height: 160px;
+  max-height: 120px;
   overflow-y: auto;
   border: 1px solid var(--border-cyan);
   border-radius: 8px;
