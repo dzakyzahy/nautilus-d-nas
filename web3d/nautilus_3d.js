@@ -72,6 +72,7 @@ window.addEventListener("DOMContentLoaded", () => {
   // [Diky] Init Diky's components
   renderShardAuditTable();
   initCodecControlDrawer();
+  initWebSocketLogStream();
 });
 
 // ---------------------------------------------------------------------------
@@ -1224,39 +1225,46 @@ function initCodecControlDrawer() {
     drawer.style.display = "none";
   });
 
-  // Trigger API: POST /api/reconstruct with form values
+  // Trigger API: POST /api/pipeline/run-all (full 3-step pipeline via real backend)
   document.getElementById("cc-btn-trigger-api").addEventListener("click", async () => {
     const missionId = document.getElementById("cc-mission-id").value.trim() || "SUBSEA-2026-ALPHA";
     const ingestDir = document.getElementById("cc-ingest-dir").value.trim();
     const outputDir = document.getElementById("cc-output-dir").value.trim();
+    const k = Math.max(1, parseInt(inputK.value) || 6);
+    const m = Math.max(1, parseInt(inputM.value) || 4);
     const responseBox = document.getElementById("cc-api-response");
     const responsePre = document.getElementById("cc-response-pre");
 
     responseBox.style.display = "flex";
     responsePre.textContent = "Connecting to FastAPI backend...";
-    logTerminal(`[API] POST /api/reconstruct → mission_id=${missionId}`, "info");
+    logTerminal(`[API] POST /api/pipeline/run-all → mission_id=${missionId}`, "info");
 
     try {
-      const res = await fetch("/api/reconstruct", {
+      const res = await fetch("/api/pipeline/run-all", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           mission_id: missionId,
           ingest_dir: ingestDir,
-          output_dir: outputDir
+          output_dir: outputDir,
+          data_shards_k: k,
+          parity_shards_m: m,
+          enable_ai_index: true
         })
       });
       const data = await res.json();
       responsePre.textContent = JSON.stringify(data, null, 2);
-      logTerminal(`[API] Response: ${res.status} — ${data.status || "ok"}`, res.ok ? "success" : "warning");
+      const ok = res.ok && data.pipeline_status === "SUCCESS_100_PERCENT_RECOVERED";
+      logTerminal(`[API] Pipeline: ${data.pipeline_status || res.status}`, ok ? "success" : "warning");
     } catch (err) {
       // Mock response when backend not running
       const mock = {
         status: "mock_offline",
         message: "Backend not reachable. Run: uvicorn api_server:app --port 8000",
+        hint: "Or use: docker compose up -d nautilus-backend",
         mission_id: missionId,
-        k: SWARM_CONFIG.k,
-        m: SWARM_CONFIG.m
+        data_shards_k: k,
+        parity_shards_m: m
       };
       responsePre.textContent = JSON.stringify(mock, null, 2);
       logTerminal("[API] Backend offline — showing mock response.", "warning");
@@ -1272,4 +1280,48 @@ function binomCoeff(n, k) {
     res = res * (n - i) / (i + 1);
   }
   return res;
+}
+
+// ---------------------------------------------------------------------------
+// [Diky] WebSocket Real-Time Log Bridge — connects to FastAPI /ws/logs
+// Silently skips if backend is offline; no error shown to user
+// ---------------------------------------------------------------------------
+function initWebSocketLogStream() {
+  const wsUrl = `ws://${location.hostname}:8000/ws/logs`;
+  let ws;
+  let retryTimer = null;
+
+  // Level → logTerminal type mapping
+  const levelMap = { SUCCESS: "success", ERROR: "danger", WARNING: "warning", INFO: "info" };
+
+  function connect() {
+    try {
+      ws = new WebSocket(wsUrl);
+
+      ws.onopen = () => {
+        logTerminal("[WS] Live log stream connected to UGREEN AI NAS backend.", "success");
+        clearTimeout(retryTimer);
+      };
+
+      ws.onmessage = (evt) => {
+        try {
+          const payload = JSON.parse(evt.data);
+          const type = levelMap[payload.level] || "info";
+          const prefix = payload.mission_id ? `[${payload.mission_id}] ` : "";
+          logTerminal(`${prefix}${payload.message}`, type);
+        } catch (_) { /* malformed frame, skip */ }
+      };
+
+      ws.onclose = () => {
+        // Backend not up — retry silently every 10s (ponytail: no exponential backoff, single retry cadence ok for demo)
+        retryTimer = setTimeout(connect, 10000);
+      };
+
+      ws.onerror = () => {
+        ws.close();
+      };
+    } catch (_) { /* WebSocket API not available, skip */ }
+  }
+
+  connect();
 }
