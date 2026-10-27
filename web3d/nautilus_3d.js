@@ -68,6 +68,10 @@ window.addEventListener("DOMContentLoaded", () => {
 
   logTerminal("Nautilus D-NAS 3D Ocean Visualizer loaded successfully.", "success");
   logTerminal("Connected to UGREEN AI NAS iDX6011 Pro (Edge UGOS Pro).", "info");
+
+  // [Diky] Init Diky's components
+  renderShardAuditTable();
+  initCodecControlDrawer();
 });
 
 // ---------------------------------------------------------------------------
@@ -665,6 +669,7 @@ function sinkDrone(index) {
   renderDroneGridUI();
   updateHUDMetrics();
   createAcousticMeshLinks();
+  renderShardAuditTable();
 }
 
 function corruptDroneShard(index) {
@@ -683,6 +688,7 @@ function corruptDroneShard(index) {
 
   renderDroneGridUI();
   updateHUDMetrics();
+  renderShardAuditTable();
 }
 
 // Reset Entire Swarm to Initial State
@@ -706,6 +712,7 @@ function resetSwarm() {
   renderDroneGridUI();
   updateHUDMetrics();
   createAcousticMeshLinks();
+  renderShardAuditTable();
   logTerminal("[SYS] Swarm fleet reset to standard Bravo-7 patrol formation.", "info");
 }
 
@@ -1123,4 +1130,146 @@ function animate(time) {
 
   controls.update();
   renderer.render(scene, camera);
+}
+
+// ---------------------------------------------------------------------------
+// [Diky] ShardAuditTable — renders SHA-256 integrity table from SWARM_CONFIG
+// Called after: resetSwarm(), sinkDrone(), corruptDroneShard(), executeNautilusPipeline()
+// ---------------------------------------------------------------------------
+function renderShardAuditTable() {
+  const tbody = document.getElementById("shard-audit-tbody");
+  if (!tbody) return;
+
+  tbody.innerHTML = "";
+  SWARM_CONFIG.drones.forEach(d => {
+    const tr = document.createElement("tr");
+    const statusClass = d.status === "online" ? "valid" : d.status;  // "valid"|"sunken"|"corrupt"
+    const statusLabel = d.status === "online" ? "VALID" : d.status === "sunken" ? "LOST" : "QUARANTINED";
+    tr.innerHTML = `
+      <td class="sat-type-${d.type}">${d.shardId}</td>
+      <td>${d.id}</td>
+      <td class="sat-type-${d.type}">${d.type.toUpperCase()}</td>
+      <td class="sat-hash">${d.hash}</td>
+      <td><span class="sat-badge ${statusClass}">${statusLabel}</span></td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+// ---------------------------------------------------------------------------
+// [Diky] CodecControl Drawer — form + apply + API trigger
+// ---------------------------------------------------------------------------
+function initCodecControlDrawer() {
+  const drawer = document.getElementById("codec-control-drawer");
+  const btnOpen = document.getElementById("btn-codec-panel");
+  const btnClose = document.getElementById("btn-close-codec");
+  const inputK = document.getElementById("cc-k");
+  const inputM = document.getElementById("cc-m");
+  const nDisplay = document.getElementById("cc-n-display");
+  const rSwarmDisplay = document.getElementById("cc-rswarm-display");
+  const maxLossDisplay = document.getElementById("cc-maxloss-display");
+
+  if (!drawer || !btnOpen) return;
+
+  // Toggle drawer
+  btnOpen.addEventListener("click", () => {
+    const isOpen = drawer.style.display !== "none";
+    drawer.style.display = isOpen ? "none" : "block";
+    if (!isOpen) updateCodecDerived();
+  });
+  btnClose.addEventListener("click", () => { drawer.style.display = "none"; });
+
+  // Live k/m → n + R_swarm recalculation
+  function updateCodecDerived() {
+    const k = Math.max(1, parseInt(inputK.value) || 6);
+    const m = Math.max(1, parseInt(inputM.value) || 4);
+    const n = k + m;
+    nDisplay.textContent = n;
+
+    // Binomial R_swarm = P(X >= k) where X~Binom(n, p_survive=0.7)
+    const p = 0.70;
+    let prob = 0;
+    for (let i = k; i <= n; i++) {
+      prob += binomCoeff(n, i) * Math.pow(p, i) * Math.pow(1 - p, n - i);
+    }
+    rSwarmDisplay.textContent = `~${(prob * 100).toFixed(1)}%`;
+    maxLossDisplay.textContent = `m = ${m} drones`;
+  }
+
+  inputK.addEventListener("input", updateCodecDerived);
+  inputM.addEventListener("input", updateCodecDerived);
+
+  // Apply: update SWARM_CONFIG + rebuild UI
+  document.getElementById("cc-btn-apply").addEventListener("click", () => {
+    const k = Math.max(1, parseInt(inputK.value) || 6);
+    const m = Math.max(1, parseInt(inputM.value) || 4);
+    const n = k + m;
+
+    if (n > 10) {
+      logTerminal(`[CODEC CTRL] n=${n} exceeds fleet size (10). Reduce k+m.`, "warning");
+      return;
+    }
+
+    SWARM_CONFIG.k = k;
+    SWARM_CONFIG.m = m;
+
+    // Sync UI param boxes
+    document.getElementById("val-k").textContent = k;
+    document.getElementById("val-m").textContent = m;
+    document.getElementById("val-n").textContent = n;
+
+    logTerminal(`[CODEC CTRL] Applied: k=${k}, m=${m}, n=${n}. Swarm config updated.`, "success");
+    renderShardAuditTable();
+    updateHUDMetrics();
+    drawer.style.display = "none";
+  });
+
+  // Trigger API: POST /api/reconstruct with form values
+  document.getElementById("cc-btn-trigger-api").addEventListener("click", async () => {
+    const missionId = document.getElementById("cc-mission-id").value.trim() || "SUBSEA-2026-ALPHA";
+    const ingestDir = document.getElementById("cc-ingest-dir").value.trim();
+    const outputDir = document.getElementById("cc-output-dir").value.trim();
+    const responseBox = document.getElementById("cc-api-response");
+    const responsePre = document.getElementById("cc-response-pre");
+
+    responseBox.style.display = "flex";
+    responsePre.textContent = "Connecting to FastAPI backend...";
+    logTerminal(`[API] POST /api/reconstruct → mission_id=${missionId}`, "info");
+
+    try {
+      const res = await fetch("/api/reconstruct", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          mission_id: missionId,
+          ingest_dir: ingestDir,
+          output_dir: outputDir
+        })
+      });
+      const data = await res.json();
+      responsePre.textContent = JSON.stringify(data, null, 2);
+      logTerminal(`[API] Response: ${res.status} — ${data.status || "ok"}`, res.ok ? "success" : "warning");
+    } catch (err) {
+      // Mock response when backend not running
+      const mock = {
+        status: "mock_offline",
+        message: "Backend not reachable. Run: uvicorn api_server:app --port 8000",
+        mission_id: missionId,
+        k: SWARM_CONFIG.k,
+        m: SWARM_CONFIG.m
+      };
+      responsePre.textContent = JSON.stringify(mock, null, 2);
+      logTerminal("[API] Backend offline — showing mock response.", "warning");
+    }
+  });
+}
+
+// Binomial coefficient helper (ponytail: no BigInt, n<=20 safe)
+function binomCoeff(n, k) {
+  if (k === 0 || k === n) return 1;
+  let res = 1;
+  for (let i = 0; i < k; i++) {
+    res = res * (n - i) / (i + 1);
+  }
+  return res;
 }

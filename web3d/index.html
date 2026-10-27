@@ -53,6 +53,7 @@
       <!-- Action Buttons -->
       <div class="top-actions">
         <button id="btn-reset-scene" class="hud-btn secondary" title="Reset Swarm to initial patrol">⟳ Reset Swarm</button>
+        <button id="btn-codec-panel" class="hud-btn secondary" title="Open Codec Control Panel">⚙ Codec Control</button>
         <button id="btn-view-docs" class="hud-btn secondary" onclick="window.open('/docs', '_blank')">API Docs</button>
       </div>
     </header>
@@ -174,6 +175,27 @@
             </div>
           </div>
 
+          <!-- [Diky] Shard Audit Table: SHA-256 status per shard -->
+          <div class="shard-audit-section">
+            <div class="section-label">Shard Integrity Audit (SHA-256)</div>
+            <div class="shard-audit-table-wrap">
+              <table class="shard-audit-table" id="shard-audit-table">
+                <thead>
+                  <tr>
+                    <th>Shard</th>
+                    <th>Drone</th>
+                    <th>Type</th>
+                    <th>SHA-256</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody id="shard-audit-tbody">
+                  <!-- Rendered via JS: renderShardAuditTable() -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+
           <!-- Live Real-Time Terminal Output Console -->
           <div class="terminal-container">
             <div class="terminal-top">
@@ -230,6 +252,77 @@
       <div class="ticker-item author">Built for UGREEN Hackathon on AI NAS by <strong>Diky Dwi Anggara Permadi</strong> & <strong>Dzaky Zahy Rabbani</strong></div>
     </footer>
 
+  </div>
+
+  <!-- [Diky] Codec Control Drawer -->
+  <div id="codec-control-drawer" class="codec-drawer" style="display:none;">
+    <div class="codec-drawer-inner">
+      <div class="codec-drawer-header">
+        <span class="codec-drawer-title">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+          Codec Control Panel
+        </span>
+        <button class="close-modal" id="btn-close-codec" aria-label="Close codec panel">✕</button>
+      </div>
+      <div class="codec-drawer-body">
+        <!-- Mission Parameters -->
+        <div class="codec-section">
+          <div class="codec-section-title">Mission Parameters</div>
+          <div class="codec-form-grid">
+            <div class="codec-field">
+              <label for="cc-mission-id">Mission ID</label>
+              <input type="text" id="cc-mission-id" class="codec-input" value="SUBSEA-2026-ALPHA" placeholder="SUBSEA-2026-ALPHA" spellcheck="false">
+            </div>
+            <div class="codec-field">
+              <label for="cc-ingest-dir">Ingest Directory</label>
+              <input type="text" id="cc-ingest-dir" class="codec-input" value="/volume1/nautilus_missions/incoming" placeholder="/volume1/..." spellcheck="false">
+            </div>
+            <div class="codec-field">
+              <label for="cc-output-dir">Output Directory</label>
+              <input type="text" id="cc-output-dir" class="codec-input" value="/volume1/nautilus_missions/reconstructed" placeholder="/volume1/..." spellcheck="false">
+            </div>
+          </div>
+        </div>
+        <!-- Reed-Solomon Parameters -->
+        <div class="codec-section">
+          <div class="codec-section-title">Reed-Solomon GF(2⁸) Parameters</div>
+          <div class="codec-form-grid codec-rs-grid">
+            <div class="codec-field">
+              <label for="cc-k">Data Shards (k)</label>
+              <input type="number" id="cc-k" class="codec-input" value="6" min="1" max="9">
+            </div>
+            <div class="codec-field">
+              <label for="cc-m">Parity Shards (m)</label>
+              <input type="number" id="cc-m" class="codec-input" value="4" min="1" max="9">
+            </div>
+            <div class="codec-field">
+              <label>Total (n = k+m)</label>
+              <div class="codec-derived" id="cc-n-display">10</div>
+            </div>
+          </div>
+          <div class="codec-formula">
+            R<sub>swarm</sub> = <span id="cc-rswarm-display">~95.0%</span> &nbsp;|&nbsp;
+            Max tolerable loss: <span id="cc-maxloss-display">m = 4 drones</span>
+          </div>
+        </div>
+        <!-- Action -->
+        <div class="codec-actions">
+          <button id="cc-btn-apply" class="hud-btn primary-glow">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
+            Apply & Update Swarm Config
+          </button>
+          <button id="cc-btn-trigger-api" class="hud-btn secondary">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+            Trigger Verify &amp; Decode (API)
+          </button>
+        </div>
+        <!-- API Response -->
+        <div class="codec-api-response" id="cc-api-response" style="display:none;">
+          <div class="codec-section-title">API Response</div>
+          <pre class="codec-response-pre" id="cc-response-pre"></pre>
+        </div>
+      </div>
+    </div>
   </div>
 
   <script src="nautilus_3d.js"></script>
