@@ -1,0 +1,22 @@
+services:
+  nautilus-backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: nautilus-dnas-backend
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - PYTHONUNBUFFERED=1
+      - DEFAULT_INGEST_DIR=/volume1/nautilus_missions/incoming
+      - DEFAULT_OUTPUT_DIR=/volume1/nautilus_missions/reconstructed
+    volumes:
+      # Mount UGREEN NAS physical volumes
+      - ./data/incoming:/volume1/nautilus_missions/incoming
+      - ./data/reconstructed:/volume1/nautilus_missions/reconstructed
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
