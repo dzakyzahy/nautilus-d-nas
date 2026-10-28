@@ -17,6 +17,7 @@ let mouse = new THREE.Vector2();
 let selectedDroneIndex = null;
 let currentCameraMode = "orbit";
 let isReconstructing = false;
+let lastFrameTime = 0;
 
 // 10 Drones Swarm Fleet (k=6 data, m=4 parity)
 const SWARM_CONFIG = {
@@ -634,37 +635,50 @@ function closeDroneInspector() {
 }
 
 // ---------------------------------------------------------------------------
-// Simulation Actions: Sink Drones, Inject Bit-Rot, Reset
+// Simulation Actions: Sink Drones, Inject Bit-Rot, Reset (with P2P & Physics)
 // ---------------------------------------------------------------------------
-function sinkDrone(index) {
+function sinkDrone(index, isRemote = false) {
   const drone = SWARM_CONFIG.drones[index];
+  if (!drone) return;
+
   if (drone.status === "sunken") {
     // Revive
     drone.status = "online";
     drone.mesh.visible = true;
-    new TWEEN.Tween(drone.mesh.position)
-      .to({ y: drone.initialPos.y }, 1500)
-      .easing(TWEEN.Easing.Quadratic.Out)
-      .start();
+
+    if (window.NautilusOceanPhysics) {
+      window.NautilusOceanPhysics.revive(index, drone.initialPos.y);
+    } else {
+      new TWEEN.Tween(drone.mesh.position)
+        .to({ y: drone.initialPos.y }, 1500)
+        .easing(TWEEN.Easing.Quadratic.Out)
+        .start();
+    }
+
     drone.beaconLight.color.setHex(drone.type === "data" ? 0x22d3ee : 0xa855f7);
     drone.beaconMesh.material.color.setHex(drone.type === "data" ? 0x22d3ee : 0xa855f7);
-    logTerminal(`[REVIVE] ${drone.id} re-established acoustic link. Shard ${drone.shardId} back online.`, "info");
+    logTerminal(`[REVIVE] ${drone.id} re-established acoustic link. Shard ${drone.shardId} back online.${isRemote ? ' (P2P Remote)' : ''}`, "info");
   } else {
     // Sink drone
     drone.status = "sunken";
     drone.beaconLight.color.setHex(0xef4444);
     drone.beaconMesh.material.color.setHex(0xef4444);
 
-    // Plunge drone down into abyss
-    new TWEEN.Tween(drone.mesh.position)
-      .to({ y: -48, x: drone.mesh.position.x + (Math.random() - 0.5) * 6 }, 2500)
-      .easing(TWEEN.Easing.Quadratic.In)
-      .onComplete(() => {
-        drone.mesh.visible = false;
-      })
-      .start();
+    if (window.NautilusOceanPhysics) {
+      window.NautilusOceanPhysics.sink(index);
+    } else {
+      new TWEEN.Tween(drone.mesh.position)
+        .to({ y: -48, x: drone.mesh.position.x + (Math.random() - 0.5) * 6 }, 2500)
+        .easing(TWEEN.Easing.Quadratic.In)
+        .start();
+    }
 
-    logTerminal(`[ALERT] ${drone.id} hull breached / sunken into trench! Shard ${drone.shardId} lost.`, "danger");
+    logTerminal(`[ALERT] ${drone.id} hull breached / sunken into trench! Shard ${drone.shardId} lost.${isRemote ? ' (P2P Remote)' : ''}`, "danger");
+  }
+
+  // P2P multi-client synchronization
+  if (!isRemote && window.NautilusP2P) {
+    window.NautilusP2P.broadcastSink(index);
   }
 
   renderDroneGridUI();
@@ -673,18 +687,25 @@ function sinkDrone(index) {
   renderShardAuditTable();
 }
 
-function corruptDroneShard(index) {
+function corruptDroneShard(index, isRemote = false) {
   const drone = SWARM_CONFIG.drones[index];
+  if (!drone) return;
+
   if (drone.status === "corrupt") {
     drone.status = "online";
     drone.beaconLight.color.setHex(drone.type === "data" ? 0x22d3ee : 0xa855f7);
     drone.beaconMesh.material.color.setHex(drone.type === "data" ? 0x22d3ee : 0xa855f7);
-    logTerminal(`[AUDIT] ${drone.id} parity scrubbed. Checksum restored.`, "success");
+    logTerminal(`[AUDIT] ${drone.id} parity scrubbed. Checksum restored.${isRemote ? ' (P2P Remote)' : ''}`, "success");
   } else {
     drone.status = "corrupt";
     drone.beaconLight.color.setHex(0xf59e0b);
     drone.beaconMesh.material.color.setHex(0xf59e0b);
-    logTerminal(`[WARNING] Bit-rot detected on ${drone.id} (Shard ${drone.shardId}). Hash verification failed!`, "warning");
+    logTerminal(`[WARNING] Bit-rot detected on ${drone.id} (Shard ${drone.shardId}). Hash verification failed!${isRemote ? ' (P2P Remote)' : ''}`, "warning");
+  }
+
+  // P2P multi-client synchronization
+  if (!isRemote && window.NautilusP2P) {
+    window.NautilusP2P.broadcastCorrupt(index);
   }
 
   renderDroneGridUI();
@@ -693,10 +714,15 @@ function corruptDroneShard(index) {
 }
 
 // Reset Entire Swarm to Initial State
-function resetSwarm() {
+function resetSwarm(isRemote = false) {
   SWARM_CONFIG.drones.forEach((drone) => {
     drone.status = "online";
     drone.mesh.visible = true;
+
+    if (window.NautilusOceanPhysics) {
+      window.NautilusOceanPhysics.revive(drone.index, drone.initialPos.y);
+    }
+
     new TWEEN.Tween(drone.mesh.position)
       .to({ x: drone.initialPos.x, y: drone.initialPos.y, z: drone.initialPos.z }, 1000)
       .easing(TWEEN.Easing.Cubic.Out)
@@ -710,19 +736,28 @@ function resetSwarm() {
     matrixHoloGroup = null;
   }
 
+  // P2P multi-client synchronization
+  if (!isRemote && window.NautilusP2P) {
+    window.NautilusP2P.broadcastReset();
+  }
+
   renderDroneGridUI();
   updateHUDMetrics();
   createAcousticMeshLinks();
   renderShardAuditTable();
-  logTerminal("[SYS] Swarm fleet reset to standard Bravo-7 patrol formation.", "info");
+  logTerminal(`[SYS] Swarm fleet reset to standard Bravo-7 patrol formation.${isRemote ? ' (P2P Remote)' : ''}`, "info");
 }
 
 // ---------------------------------------------------------------------------
 // NAUTILUS D-NAS RECONSTRUCTION PIPELINE (The Brain in Action)
 // ---------------------------------------------------------------------------
-async function executeNautilusPipeline() {
+async function executeNautilusPipeline(isRemote = false) {
   if (isReconstructing) return;
   isReconstructing = true;
+
+  if (!isRemote && window.NautilusP2P) {
+    window.NautilusP2P.broadcastPipeline();
+  }
 
   const btn = document.getElementById("btn-run-pipeline");
   const spinner = document.getElementById("pipeline-spinner");
@@ -869,7 +904,25 @@ async function runPhase3AIIndexing() {
 
   await delay(1800);
 
-  logTerminal("[UGOS-AI] Vision model detected subsea pipeline micro-fracture (Conf: 96.4%).", "success");
+  // In-Browser Edge AI Sonar Inference (WASM / ONNX)
+  let aiResult = {
+    label: "PIPELINE_MICROFRACTURE",
+    confidence: 97.8,
+    latencyMs: 2.4,
+    engine: "WASM-SIMD Neural Core"
+  };
+
+  if (window.NautilusSonarAI) {
+    try {
+      aiResult = await window.NautilusSonarAI.classify(true);
+      window.NautilusSonarAI.updateHUD(aiResult);
+    } catch (err) {
+      console.warn("Sonar AI execution fallback:", err);
+    }
+  }
+
+  logTerminal(`[EDGE-AI] ${aiResult.engine} classified sonar spectrogram in ${aiResult.latencyMs}ms.`, "success");
+  logTerminal(`[UGOS-AI] Detected ${aiResult.label} (Conf: ${aiResult.confidence}%).`, "success");
   logTerminal("[UGOS-AI] MISSION_RECOVERY_REPORT.md compiled in /volume1/nautilus_missions/reconstructed/.", "success");
   logTerminal("✔ Mission recovery fully finalized with zero data loss!", "success");
 
@@ -1098,21 +1151,22 @@ function animate(time) {
     if (holoDome) holoDome.rotation.y += 0.01;
   }
 
-  // 3. Animate Drones Undulation and Sonar
-  SWARM_CONFIG.drones.forEach((d, idx) => {
-    if (d.status !== "sunken") {
-      // Natural buoyancy hover
-      d.mesh.position.y = d.initialPos.y + Math.sin(elapsedTime * 1.5 + idx) * 0.6;
-      d.mesh.rotation.z = Math.sin(elapsedTime * 1.2 + idx) * 0.05;
-      d.mesh.rotation.y = Math.sin(elapsedTime * 0.8 + idx) * 0.08;
+  // Calculate frame delta time
+  const dt = lastFrameTime ? Math.min((time - lastFrameTime) * 0.001, 0.05) : 0.016;
+  lastFrameTime = time;
 
-      // Sonar beam pulse scale
-      if (d.sonarCone) {
-        const pulse = 1.0 + Math.sin(elapsedTime * 4.0 + idx) * 0.15;
-        d.sonarCone.scale.set(pulse, pulse, pulse);
+  // 3. Subsea Ocean Physics Step (Buoyancy, Fluid Drag, Terminal Descent)
+  if (window.NautilusOceanPhysics) {
+    window.NautilusOceanPhysics.step(SWARM_CONFIG.drones, dt, elapsedTime);
+  } else {
+    SWARM_CONFIG.drones.forEach((d, idx) => {
+      if (d.status !== "sunken") {
+        d.mesh.position.y = d.initialPos.y + Math.sin(elapsedTime * 1.5 + idx) * 0.6;
+        d.mesh.rotation.z = Math.sin(elapsedTime * 1.2 + idx) * 0.05;
+        d.mesh.rotation.y = Math.sin(elapsedTime * 0.8 + idx) * 0.08;
       }
-    }
-  });
+    });
+  }
 
   // 4. Update dynamic mesh lines
   updateMeshLines();

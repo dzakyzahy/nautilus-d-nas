@@ -147,6 +147,13 @@ body, html {
   color: #fff;
 }
 
+.status-pill.p2p {
+  border-color: rgba(16, 185, 129, 0.4);
+}
+.status-pill.p2p .pill-label {
+  color: #10b981;
+}
+
 .top-actions {
   display: flex;
   gap: 8px;

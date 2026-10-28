@@ -384,3 +384,14 @@ async def websocket_logs_endpoint(websocket: WebSocket):
             await websocket.receive_text()
     except WebSocketDisconnect:
         broadcaster.disconnect(websocket)
+
+
+# Mount web3d command center
+web3d_path = os.path.join(os.path.dirname(__file__), "web3d")
+if os.path.exists(web3d_path):
+    app.mount("/web3d", StaticFiles(directory=web3d_path, html=True), name="web3d")
+
+    @app.get("/")
+    def redirect_root():
+        return FileResponse(os.path.join(web3d_path, "index.html"))
+

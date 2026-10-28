@@ -48,6 +48,10 @@
           <span class="pill-label">SWARM FLEET</span>
           <span class="pill-val" id="hud-fleet-status">10 / 10 ONLINE</span>
         </div>
+        <div class="status-pill p2p">
+          <span class="pill-label">P2P MESH</span>
+          <span class="pill-val" id="hud-p2p-status"><span style="color:#10b981;">●</span> 1 PEER (LOCAL)</span>
+        </div>
       </div>
 
       <!-- Action Buttons -->
@@ -248,7 +252,7 @@
     <!-- Bottom Mission Ticker Bar -->
     <footer class="bottom-bar">
       <div class="ticker-item"><strong>Mission:</strong> <code>SUBSEA-2026-ALPHA</code></div>
-      <div class="ticker-item"><strong>Mathematical Fault-Tolerance:</strong> \(m = 4\) parity shards (guarantees 100% recovery for \(\le 4\) drone losses)</div>
+      <div class="ticker-item"><strong>Mathematical Fault-Tolerance:</strong> <em>m</em> = 4 parity shards (guarantees 100% recovery for &le; 4 drone losses)</div>
       <div class="ticker-item author">Built for UGREEN Hackathon on AI NAS by <strong>Diky Dwi Anggara Permadi</strong> & <strong>Dzaky Zahy Rabbani</strong></div>
     </footer>
 
@@ -325,6 +329,11 @@
     </div>
   </div>
 
+  <!-- Edge AI, Hydrodynamics & P2P Swarm Extensions -->
+  <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.27.0/dist/ort.min.js"></script>
+  <script src="ocean_physics.js"></script>
+  <script src="sonar_ai_engine.js"></script>
+  <script src="swarm_p2p.js"></script>
   <script src="nautilus_3d.js"></script>
 </body>
 </html>
