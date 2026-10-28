@@ -56,6 +56,8 @@
 
       <!-- Action Buttons -->
       <div class="top-actions">
+        <button id="btn-toggle-audio" class="hud-btn secondary" title="Toggle Subsea Acoustic Sound">🔊 Sound: ON</button>
+        <button id="btn-toggle-bathymetry" class="hud-btn secondary" title="Toggle 3D Bathymetric Sonar Point Cloud">🗺 Bathymetry: ON</button>
         <button id="btn-reset-scene" class="hud-btn secondary" title="Reset Swarm to initial patrol">⟳ Reset Swarm</button>
         <button id="btn-codec-panel" class="hud-btn secondary" title="Open Codec Control Panel">⚙ Codec Control</button>
         <button id="btn-view-docs" class="hud-btn secondary" onclick="window.open('/docs', '_blank')">API Docs</button>
@@ -334,6 +336,8 @@
   <script src="ocean_physics.js"></script>
   <script src="sonar_ai_engine.js"></script>
   <script src="swarm_p2p.js"></script>
+  <script src="subsea_audio.js"></script>
+  <script src="bathymetric_sonar.js"></script>
   <script src="nautilus_3d.js"></script>
 </body>
 </html>

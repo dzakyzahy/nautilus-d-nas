@@ -62,6 +62,7 @@ window.addEventListener("DOMContentLoaded", () => {
   createMotherVesselWithNAS();
   createDroneFleet();
   createAcousticMeshLinks();
+  if (window.NautilusBathymetry) window.NautilusBathymetry.init(scene);
   setupEventListeners();
   renderDroneGridUI();
   updateHUDMetrics();
@@ -673,6 +674,7 @@ function sinkDrone(index, isRemote = false) {
         .start();
     }
 
+    if (window.NautilusAudio) window.NautilusAudio.playAlarm();
     logTerminal(`[ALERT] ${drone.id} hull breached / sunken into trench! Shard ${drone.shardId} lost.${isRemote ? ' (P2P Remote)' : ''}`, "danger");
   }
 
@@ -700,6 +702,7 @@ function corruptDroneShard(index, isRemote = false) {
     drone.status = "corrupt";
     drone.beaconLight.color.setHex(0xf59e0b);
     drone.beaconMesh.material.color.setHex(0xf59e0b);
+    if (window.NautilusAudio) window.NautilusAudio.playBitRotWarning();
     logTerminal(`[WARNING] Bit-rot detected on ${drone.id} (Shard ${drone.shardId}). Hash verification failed!${isRemote ? ' (P2P Remote)' : ''}`, "warning");
   }
 
@@ -731,6 +734,7 @@ function resetSwarm(isRemote = false) {
     drone.beaconMesh.material.color.setHex(drone.type === "data" ? 0x22d3ee : 0xa855f7);
   });
 
+  if (window.NautilusBathymetry) window.NautilusBathymetry.reset();
   if (matrixHoloGroup) {
     scene.remove(matrixHoloGroup);
     matrixHoloGroup = null;
@@ -786,6 +790,7 @@ async function executeNautilusPipeline(isRemote = false) {
 
 // Phase 1: Audit & Acoustic Ingestion Beams
 async function runPhase1Audit() {
+  if (window.NautilusAudio) window.NautilusAudio.playSonarPing(880, 1.4);
   logTerminal("[STEP 1/3] Scanning incoming mission volume on UGREEN AI NAS...", "info");
 
   const validDrones = SWARM_CONFIG.drones.filter(d => d.status === "online");
@@ -868,15 +873,18 @@ async function runPhase2MatrixInversion() {
 
   document.getElementById("reconstruction-badge").className = "badge recovered";
   document.getElementById("reconstruction-badge").innerText = "100% RECOVERED & VERIFIED";
+  if (window.NautilusAudio) window.NautilusAudio.playRecoveryChime();
 
   return true;
 }
 
 // Phase 3: AI Knowledge Hub Indexing & Subsea Sonar Sweep
 async function runPhase3AIIndexing() {
+  if (window.NautilusBathymetry) window.NautilusBathymetry.triggerScan(2200);
   logTerminal("[STEP 3/3] Ingesting reconstructed media into UGREEN AI Knowledge Hub...", "info");
 
   // Animate a sweeping sonar pulse from vessel down to pipeline anomaly
+  if (window.NautilusAudio) window.NautilusAudio.playSonarPing(720, 1.8);
   const sweepGeo = new THREE.RingGeometry(0.1, 4.0, 32);
   const sweepMat = new THREE.MeshBasicMaterial({
     color: 0x10b981,
@@ -1019,6 +1027,30 @@ function setCameraView(viewKey) {
 // Event Listeners
 // ---------------------------------------------------------------------------
 function setupEventListeners() {
+  // Audio Mute/Unmute Toggle
+  const bathyBtn = document.getElementById("btn-toggle-bathymetry");
+  if (bathyBtn) {
+    bathyBtn.addEventListener("click", () => {
+      if (window.NautilusBathymetry) {
+        const visible = window.NautilusBathymetry.toggleVisibility();
+        bathyBtn.innerText = visible ? "🗺 Bathymetry: ON" : "🗺 Bathymetry: OFF";
+        bathyBtn.style.color = visible ? "#38bdf8" : "#94a3b8";
+      }
+    });
+  }
+
+  const audioBtn = document.getElementById("btn-toggle-audio");
+  if (audioBtn) {
+    audioBtn.addEventListener("click", () => {
+      if (window.NautilusAudio) {
+        window.NautilusAudio.init();
+        const muted = window.NautilusAudio.toggleMute();
+        audioBtn.innerText = muted ? "🔇 Sound: OFF" : "🔊 Sound: ON";
+        audioBtn.style.color = muted ? "#ef4444" : "#38bdf8";
+      }
+    });
+  }
+
   // Raycaster click on drones
   window.addEventListener("click", onCanvasClick);
 
