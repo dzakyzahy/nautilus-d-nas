@@ -366,68 +366,141 @@ function createDroneFleet() {
     const droneGroup = new THREE.Group();
     droneGroup.position.copy(droneData.initialPos);
 
-    // Drone Hull: Torpedo / AUV Streamlined Body
-    const hullGeo = new THREE.ConeGeometry(0.85, 4.2, 16);
-    hullGeo.rotateX(Math.PI / 2); // Point forward
     const isData = droneData.type === "data";
     const baseColor = isData ? 0x0284c7 : 0x7c3aed; // Cyan vs Purple
-    const hullMat = new THREE.MeshStandardMaterial({
-      color: 0xf1f5f9,
-      roughness: 0.3,
-      metalness: 0.7
-    });
-    const mainHull = new THREE.Mesh(hullGeo, hullMat);
-    mainHull.castShadow = true;
-    droneGroup.add(mainHull);
+    const beaconColor = isData ? 0x22d3ee : 0xa855f7;
 
-    // Color Stripe for Identification (Data vs Parity)
-    const stripeGeo = new THREE.CylinderGeometry(0.86, 0.86, 0.8, 16);
-    stripeGeo.rotateX(Math.PI / 2);
-    const stripeMat = new THREE.MeshStandardMaterial({
-      color: baseColor,
+    // 1. Central Cylindrical Pressure Hull (Titanium / PEEK Composite)
+    const midHullGeo = new THREE.CylinderGeometry(0.72, 0.72, 2.6, 24);
+    midHullGeo.rotateX(Math.PI / 2);
+    const midHullMat = new THREE.MeshStandardMaterial({
+      color: 0x0f172a,
+      metalness: 0.85,
+      roughness: 0.25
+    });
+    const midHull = new THREE.Mesh(midHullGeo, midHullMat);
+    midHull.castShadow = true;
+    droneGroup.add(midHull);
+
+    // 2. Streamlined Forward Nose Dome (Hemispherical Bow)
+    const noseGeo = new THREE.SphereGeometry(0.72, 24, 16, 0, Math.PI * 2, 0, Math.PI / 2);
+    noseGeo.rotateX(Math.PI / 2);
+    const noseMat = new THREE.MeshStandardMaterial({
+      color: 0x1e293b,
+      metalness: 0.9,
+      roughness: 0.2
+    });
+    const nose = new THREE.Mesh(noseGeo, noseMat);
+    nose.position.z = 1.3;
+    droneGroup.add(nose);
+
+    // 3. Tapered Hydrodynamic Stern (Tail Cone)
+    const tailGeo = new THREE.CylinderGeometry(0.72, 0.3, 1.4, 24);
+    tailGeo.rotateX(Math.PI / 2);
+    const tailMat = new THREE.MeshStandardMaterial({
+      color: 0x1e293b,
       metalness: 0.8,
       roughness: 0.3
     });
+    const tail = new THREE.Mesh(tailGeo, tailMat);
+    tail.position.z = -2.0;
+    droneGroup.add(tail);
+
+    // 4. Color Identification & Emissive Shard Band
+    const stripeGeo = new THREE.CylinderGeometry(0.73, 0.73, 0.65, 24);
+    stripeGeo.rotateX(Math.PI / 2);
+    const stripeMat = new THREE.MeshStandardMaterial({
+      color: baseColor,
+      emissive: baseColor,
+      emissiveIntensity: 0.3,
+      metalness: 0.8,
+      roughness: 0.25
+    });
     const stripe = new THREE.Mesh(stripeGeo, stripeMat);
-    stripe.position.z = -0.5;
+    stripe.position.z = -0.25;
     droneGroup.add(stripe);
 
-    // Hydrodynamic Fins (Top, Bottom, Sides)
-    const finGeo = new THREE.BoxGeometry(0.08, 1.2, 0.8);
-    const finMat = new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.5 });
-    const topFin = new THREE.Mesh(finGeo, finMat);
-    topFin.position.set(0, 0.7, -1.2);
-    droneGroup.add(topFin);
+    // 5. Dorsal Telemetry Mast & Optical Sensor Turret
+    const mastGeo = new THREE.BoxGeometry(0.12, 0.65, 0.5);
+    const mastMat = new THREE.MeshStandardMaterial({ color: 0x334155, metalness: 0.9, roughness: 0.3 });
+    const mast = new THREE.Mesh(mastGeo, mastMat);
+    mast.position.set(0, 0.65, 0.4);
+    droneGroup.add(mast);
 
-    const sideFinGeo = new THREE.BoxGeometry(1.6, 0.08, 0.8);
-    const sideFins = new THREE.Mesh(sideFinGeo, finMat);
-    sideFins.position.set(0, 0, -1.0);
-    droneGroup.add(sideFins);
+    const lensGeo = new THREE.SphereGeometry(0.12, 16, 12);
+    const lensMat = new THREE.MeshBasicMaterial({ color: beaconColor });
+    const lens = new THREE.Mesh(lensGeo, lensMat);
+    lens.position.set(0, 0.98, 0.58);
+    droneGroup.add(lens);
 
-    // Twin Rotating Thrusters (Rear)
-    const thrusterGeo = new THREE.CylinderGeometry(0.25, 0.25, 0.5, 12);
-    thrusterGeo.rotateX(Math.PI / 2);
-    const thrusterMat = new THREE.MeshStandardMaterial({ color: 0x334155, metalness: 0.9 });
-    const leftThruster = new THREE.Mesh(thrusterGeo, thrusterMat);
-    leftThruster.position.set(-0.5, 0, -2.1);
-    const rightThruster = new THREE.Mesh(thrusterGeo, thrusterMat);
-    rightThruster.position.set(0.5, 0, -2.1);
-    droneGroup.add(leftThruster);
-    droneGroup.add(rightThruster);
+    // 6. X-Rudder Hydrodynamic Tail Fins (Cruciform 45-degree Configuration)
+    const finGeo = new THREE.BoxGeometry(0.06, 0.9, 0.65);
+    const finMat = new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.4 });
+    [-45, 45, 135, -135].forEach((angleDeg) => {
+      const fin = new THREE.Mesh(finGeo, finMat);
+      fin.position.set(0, 0, -2.2);
+      fin.rotation.z = (angleDeg * Math.PI) / 180;
+      droneGroup.add(fin);
+    });
 
-    // Top Shard Beacon LED Indicator
-    const beaconGeo = new THREE.SphereGeometry(0.3, 16, 16);
-    const beaconColor = isData ? 0x22d3ee : 0xa855f7;
+    // 7. Twin High-Torque Ducted Thrusters & Animated Propellers
+    const thrusterDuctGeo = new THREE.CylinderGeometry(0.28, 0.28, 0.65, 16, 1, true);
+    thrusterDuctGeo.rotateX(Math.PI / 2);
+    const ductMat = new THREE.MeshStandardMaterial({ color: 0x334155, metalness: 0.9, side: THREE.DoubleSide });
+
+    const propGroupL = new THREE.Group();
+    const propGroupR = new THREE.Group();
+    const bladeGeo = new THREE.BoxGeometry(0.04, 0.44, 0.08);
+    const bladeMat = new THREE.MeshStandardMaterial({ color: 0x94a3b8, metalness: 0.95 });
+
+    [0, 120, 240].forEach((deg) => {
+      const rad = (deg * Math.PI) / 180;
+      const bladeL = new THREE.Mesh(bladeGeo, bladeMat);
+      bladeL.rotation.z = rad;
+      propGroupL.add(bladeL);
+
+      const bladeR = new THREE.Mesh(bladeGeo, bladeMat);
+      bladeR.rotation.z = rad;
+      propGroupR.add(bladeR);
+    });
+
+    // Left Thruster Unit
+    const leftDuct = new THREE.Mesh(thrusterDuctGeo, ductMat);
+    leftDuct.position.set(-0.55, 0, -2.65);
+    propGroupL.position.set(-0.55, 0, -2.65);
+    droneGroup.add(leftDuct);
+    droneGroup.add(propGroupL);
+
+    // Right Thruster Unit
+    const rightDuct = new THREE.Mesh(thrusterDuctGeo, ductMat);
+    rightDuct.position.set(0.55, 0, -2.65);
+    propGroupR.position.set(0.55, 0, -2.65);
+    droneGroup.add(rightDuct);
+    droneGroup.add(propGroupR);
+
+    // 8. Dual Forward Exploration LED Spotlights
+    const lightGeo = new THREE.CylinderGeometry(0.12, 0.12, 0.2, 12);
+    lightGeo.rotateX(Math.PI / 2);
+    const lightMat = new THREE.MeshBasicMaterial({ color: 0xe0f2fe });
+    const spotL = new THREE.Mesh(lightGeo, lightMat);
+    spotL.position.set(-0.45, -0.15, 1.3);
+    const spotR = new THREE.Mesh(lightGeo, lightMat);
+    spotR.position.set(0.45, -0.15, 1.3);
+    droneGroup.add(spotL);
+    droneGroup.add(spotR);
+
+    // 9. Top Shard Beacon LED Indicator
+    const beaconGeo = new THREE.SphereGeometry(0.28, 16, 16);
     const beaconMat = new THREE.MeshBasicMaterial({ color: beaconColor });
     const beacon = new THREE.Mesh(beaconGeo, beaconMat);
-    beacon.position.set(0, 0.85, 0);
+    beacon.position.set(0, 0.82, -0.25);
     droneGroup.add(beacon);
 
-    const beaconLight = new THREE.PointLight(beaconColor, 1.5, 12);
-    beaconLight.position.set(0, 0.85, 0);
+    const beaconLight = new THREE.PointLight(beaconColor, 1.8, 14);
+    beaconLight.position.set(0, 0.82, -0.25);
     droneGroup.add(beaconLight);
 
-    // Front Sonar Conical Projection Beam
+    // 10. Front Sonar Conical Projection Beam
     const sonarGeo = new THREE.ConeGeometry(2.4, 6.0, 16, 1, true);
     sonarGeo.rotateX(-Math.PI / 2);
     const sonarMat = new THREE.MeshBasicMaterial({
@@ -438,13 +511,14 @@ function createDroneFleet() {
       side: THREE.DoubleSide
     });
     const sonarCone = new THREE.Mesh(sonarGeo, sonarMat);
-    sonarCone.position.set(0, 0, 4.2);
+    sonarCone.position.set(0, 0, 4.3);
     droneGroup.add(sonarCone);
 
-    // Metadata attachment
+    // Metadata & Propeller references for animation loop
     droneGroup.userData = {
       droneIndex: droneData.index,
-      data: droneData
+      data: droneData,
+      propellers: [propGroupL, propGroupR]
     };
 
     droneData.mesh = droneGroup;
@@ -1199,6 +1273,15 @@ function animate(time) {
       }
     });
   }
+
+// 3b. Rotate Drone Submersible Propellers
+  SWARM_CONFIG.drones.forEach((d) => {
+    if (d.mesh && d.mesh.userData && d.mesh.userData.propellers && d.status !== "sunken") {
+      d.mesh.userData.propellers.forEach((p) => {
+        p.rotation.z += 0.35;
+      });
+    }
+  });
 
   // 4. Update dynamic mesh lines
   updateMeshLines();
