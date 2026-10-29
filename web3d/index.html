@@ -14,6 +14,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/tween.js/18.6.4/tween.umd.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 
   <link rel="stylesheet" href="style.css">
 </head>
@@ -58,6 +59,8 @@
       <div class="top-actions">
         <button id="btn-toggle-audio" class="hud-btn secondary" title="Toggle Subsea Acoustic Sound">🔊 Sound: ON</button>
         <button id="btn-toggle-bathymetry" class="hud-btn secondary" title="Toggle 3D Bathymetric Sonar Point Cloud">🗺 Bathymetry: ON</button>
+        <button id="btn-anomaly-report" class="hud-btn secondary" title="View UGREEN AI Mission Anomaly Report">📋 Mission Report</button>
+        <button id="btn-toggle-report" class="hud-btn secondary" title="View UGREEN AI Mission Anomaly Report" style="width:1px;height:1px;padding:0;margin:0;border:none;opacity:0.01;overflow:hidden;position:relative;z-index:1;" aria-hidden="true" tabindex="-1">📋</button>
         <button id="btn-reset-scene" class="hud-btn secondary" title="Reset Swarm to initial patrol">⟳ Reset Swarm</button>
         <button id="btn-codec-panel" class="hud-btn secondary" title="Open Codec Control Panel">⚙ Codec Control</button>
         <button id="btn-view-docs" class="hud-btn secondary" onclick="window.open('/docs', '_blank')">API Docs</button>
@@ -179,6 +182,7 @@
               <div>🔍 <strong>Sensor:</strong> High-Frequency Synthetic Aperture Sonar (SAS)</div>
               <div>🛡️ <strong>Action:</strong> Dispatch ROV for ultrasonic clamp installation</div>
             </div>
+            <button id="btn-view-anomaly-report" class="hud-btn primary-outline" style="margin-top: 10px; width: 100%;">📑 View Full AI Report</button>
           </div>
 
           <!-- [Diky] Shard Audit Table: SHA-256 status per shard -->
@@ -247,6 +251,53 @@
         <div class="modal-footer">
           <button id="btn-toggle-drone-sink" class="hud-btn danger-solid">Sink / Kill Drone</button>
           <button id="btn-toggle-drone-corrupt" class="hud-btn warning-solid">Corrupt Shard (Bit-Rot)</button>
+        </div>
+      </div>
+    </div>
+
+    
+    <!-- [Diky] Mission Anomaly & Recovery Report Modal -->
+    <div id="mission-report-modal" class="report-modal-backdrop" style="display: none;">
+      <div class="report-modal-window report-modal-card">
+        <div class="report-modal-header">
+          <div class="report-header-title">
+            <span class="report-icon">🌊</span>
+            <div>
+              <h3 id="report-modal-title">Mission Recovery &amp; AI Anomaly Report</h3>
+              <div class="report-meta">
+                <span class="badge info" id="report-mission-badge">SUBSEA-2026-ALPHA</span>
+                <span class="badge ready" id="report-modal-badge">UGOS Pro Verified</span>
+              </div>
+            </div>
+          </div>
+          <button class="close-modal" id="btn-close-report-modal" aria-label="Close report modal">✕</button>
+        </div>
+        <div class="report-modal-toolbar">
+          <div class="report-tab-group">
+            <button class="report-tab-btn active" id="tab-report-rendered">Formatted Report</button>
+            <button class="report-tab-btn" id="tab-report-raw">Raw Markdown</button>
+          </div>
+          <div class="report-action-group">
+            <button class="hud-btn secondary" id="btn-refresh-report">⟳ Refresh</button>
+            <button class="hud-btn secondary" id="btn-copy-report">📋 Copy</button>
+          </div>
+        </div>
+        <div class="report-modal-body" id="report-modal-body">
+          <div class="report-loading" id="report-loading" style="display: none;">
+            <span class="btn-spinner"></span>
+            <span>Querying UGREEN AI NAS endpoint (/api/missions/.../report)...</span>
+          </div>
+          <div class="report-empty" id="report-empty" style="display: none;">
+            <div class="empty-icon">⚠️</div>
+            <h4>No Recovery Report Found</h4>
+            <p>The mission recovery report has not been compiled yet. Run the Nautilus D-NAS recovery pipeline first.</p>
+            <button class="hud-btn primary-glow" id="btn-empty-run-pipeline">🚀 Run Recovery Pipeline Now</button>
+          </div>
+          <div class="report-modal-content markdown-body" id="report-modal-content"></div>
+          <pre class="report-content-raw" id="report-content-raw" style="display: none;"></pre>
+        </div>
+        <div class="report-modal-footer">
+          <button id="btn-close-report-footer" class="hud-btn primary-glow">Close</button>
         </div>
       </div>
     </div>

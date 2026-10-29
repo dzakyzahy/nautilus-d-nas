@@ -74,6 +74,7 @@ window.addEventListener("DOMContentLoaded", () => {
   // [Diky] Init Diky's components
   renderShardAuditTable();
   initCodecControlDrawer();
+  initMissionReportModal();
   initWebSocketLogStream();
 });
 
@@ -362,6 +363,19 @@ function createMotherVesselWithNAS() {
 function createDroneFleet() {
   droneMeshes = [];
 
+  // [Diky] Dual-Mode Asset Loader: load open-source LAUV AUV baked texture if available
+  let lauvHullTexture = null;
+  try {
+    const texLoader = new THREE.TextureLoader();
+    lauvHullTexture = texLoader.load("assets/models/lauv/MBake_Complete.png", () => {
+      console.log("[AUV Asset] Open-source LAUV AUV texture loaded successfully.");
+    }, undefined, () => {
+      console.log("[AUV Asset] Running in procedural PBR fallback mode.");
+    });
+  } catch (e) {
+    console.warn("[AUV Asset] TextureLoader fallback active.", e);
+  }
+
   SWARM_CONFIG.drones.forEach((droneData) => {
     const droneGroup = new THREE.Group();
     droneGroup.position.copy(droneData.initialPos);
@@ -376,7 +390,8 @@ function createDroneFleet() {
     const midHullMat = new THREE.MeshStandardMaterial({
       color: 0x0f172a,
       metalness: 0.85,
-      roughness: 0.25
+      roughness: 0.25,
+      map: lauvHullTexture || null
     });
     const midHull = new THREE.Mesh(midHullGeo, midHullMat);
     midHull.castShadow = true;
@@ -1012,6 +1027,19 @@ async function runPhase3AIIndexing() {
   const anomCard = document.getElementById("anomaly-card");
   anomCard.style.boxShadow = "0 0 25px rgba(239, 68, 68, 0.8)";
   setTimeout(() => { anomCard.style.boxShadow = "none"; }, 3500);
+
+  // Pulse report buttons to notify user without auto-opening modal
+  const reportBtns = [
+    document.getElementById("btn-anomaly-report"),
+    document.getElementById("btn-toggle-report"),
+    document.getElementById("btn-view-anomaly-report")
+  ];
+  reportBtns.forEach(b => {
+    if (b) {
+      b.classList.add("pulse-glow");
+      setTimeout(() => b.classList.remove("pulse-glow"), 6000);
+    }
+  });
 }
 
 // 3D Matrix Hologram Generator
@@ -1456,7 +1484,8 @@ function binomCoeff(n, k) {
 // Silently skips if backend is offline; no error shown to user
 // ---------------------------------------------------------------------------
 function initWebSocketLogStream() {
-  const wsUrl = `ws://${location.hostname}:8000/ws/logs`;
+  const portStr = location.port ? `:${location.port}` : ':8000';
+  const wsUrl = `ws://${location.hostname}${portStr}/ws/logs`;
   let ws;
   let retryTimer = null;
 
@@ -1494,3 +1523,307 @@ function initWebSocketLogStream() {
 
   connect();
 }
+
+
+// ---------------------------------------------------------------------------
+// [Diky] Mission Anomaly Report Modal Component
+// ---------------------------------------------------------------------------
+let currentMissionReportMarkdown = "";
+
+async function openMissionReportModal(missionId) {
+  const modal = document.getElementById("mission-report-modal");
+  const loadingBox = document.getElementById("report-loading");
+  const emptyBox = document.getElementById("report-empty");
+  const renderedBox = document.getElementById("report-modal-content");
+  const rawBox = document.getElementById("report-content-raw");
+  const badgeEl = document.getElementById("report-mission-badge");
+  const tabRendered = document.getElementById("tab-report-rendered");
+  const tabRaw = document.getElementById("tab-report-raw");
+
+  if (!modal) return;
+
+  const targetMission = (typeof missionId === "string" && missionId.trim().length > 0)
+    ? missionId.trim()
+    : ((document.getElementById("cc-mission-id") && document.getElementById("cc-mission-id").value.trim()) || "SUBSEA-2026-ALPHA");
+
+  if (badgeEl) badgeEl.innerText = targetMission;
+
+  modal.style.display = "flex";
+  if (loadingBox) loadingBox.style.display = "flex";
+  if (emptyBox) emptyBox.style.display = "none";
+  if (renderedBox) renderedBox.style.display = "none";
+  if (rawBox) rawBox.style.display = "none";
+
+  // Reset tab selection to Formatted
+  if (tabRendered) tabRendered.classList.add("active");
+  if (tabRaw) tabRaw.classList.remove("active");
+
+  try {
+    const res = await fetch(`/api/missions/${encodeURIComponent(targetMission)}/report`);
+    if (loadingBox) loadingBox.style.display = "none";
+
+    if (res.ok) {
+      const data = await res.json();
+      currentMissionReportMarkdown = data.markdown_report || "";
+      if (rawBox) rawBox.textContent = currentMissionReportMarkdown;
+
+      const renderedHtml = (window.marked && typeof window.marked.parse === "function")
+        ? window.marked.parse(currentMissionReportMarkdown)
+        : fallbackParseMarkdown(currentMissionReportMarkdown);
+
+      if (renderedBox) {
+        renderedBox.innerHTML = enhanceReportBadges(renderedHtml);
+        renderedBox.style.display = "block";
+      }
+    } else if (res.status === 404) {
+      if (emptyBox) emptyBox.style.display = "flex";
+    } else {
+      if (renderedBox) {
+        renderedBox.innerHTML = `
+          <div class="report-empty">
+            <div class="empty-icon">⚠️</div>
+            <h4>Error ${res.status}: Failed to Load Report</h4>
+            <p>Could not retrieve report for mission <code>${escapeHtml(targetMission)}</code> from edge server.</p>
+          </div>`;
+        renderedBox.style.display = "block";
+      }
+    }
+  } catch (err) {
+    console.warn("[Report] Network error fetching report:", err);
+    if (loadingBox) loadingBox.style.display = "none";
+    if (renderedBox) {
+      renderedBox.innerHTML = `
+        <div class="report-empty">
+          <div class="empty-icon">📡</div>
+          <h4>Connection Refused / Offline</h4>
+          <p>Failed to connect to <code>/api/missions/${escapeHtml(targetMission)}/report</code>. Ensure the API server is running on port 8000.</p>
+        </div>`;
+      renderedBox.style.display = "block";
+    }
+  }
+}
+
+function closeMissionReportModal() {
+  const modal = document.getElementById("mission-report-modal");
+  if (modal) modal.style.display = "none";
+}
+
+function initMissionReportModal() {
+  const modal = document.getElementById("mission-report-modal");
+  const btnAnomaly = document.getElementById("btn-anomaly-report");
+  const btnToggle = document.getElementById("btn-toggle-report");
+  const btnViewCard = document.getElementById("btn-view-anomaly-report");
+  const btnClose = document.getElementById("btn-close-report-modal");
+  const btnCloseFooter = document.getElementById("btn-close-report-footer");
+  const btnRefresh = document.getElementById("btn-refresh-report");
+  const btnCopy = document.getElementById("btn-copy-report");
+  const btnEmptyRun = document.getElementById("btn-empty-run-pipeline");
+  const tabRendered = document.getElementById("tab-report-rendered");
+  const tabRaw = document.getElementById("tab-report-raw");
+  const renderedBox = document.getElementById("report-modal-content");
+  const rawBox = document.getElementById("report-content-raw");
+
+  if (!modal) return;
+
+  const triggerOpen = () => openMissionReportModal();
+  if (btnAnomaly) btnAnomaly.addEventListener("click", triggerOpen);
+  if (btnToggle) btnToggle.addEventListener("click", triggerOpen);
+  if (btnViewCard) btnViewCard.addEventListener("click", triggerOpen);
+
+  if (btnClose) btnClose.addEventListener("click", closeMissionReportModal);
+  if (btnCloseFooter) btnCloseFooter.addEventListener("click", closeMissionReportModal);
+  if (btnRefresh) btnRefresh.addEventListener("click", triggerOpen);
+
+  // Close on backdrop click
+  modal.addEventListener("click", (e) => {
+    if (e.target === modal) closeMissionReportModal();
+  });
+
+  // Close on Escape key
+  window.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && modal.style.display !== "none") {
+      closeMissionReportModal();
+    }
+  });
+
+  // Empty state pipeline runner
+  if (btnEmptyRun) {
+    btnEmptyRun.addEventListener("click", () => {
+      closeMissionReportModal();
+      if (typeof executeNautilusPipeline === "function") {
+        executeNautilusPipeline();
+      }
+    });
+  }
+
+  // Tabs
+  if (tabRendered && tabRaw && renderedBox && rawBox) {
+    tabRendered.addEventListener("click", () => {
+      tabRendered.classList.add("active");
+      tabRaw.classList.remove("active");
+      renderedBox.style.display = "block";
+      rawBox.style.display = "none";
+    });
+
+    tabRaw.addEventListener("click", () => {
+      tabRaw.classList.add("active");
+      tabRendered.classList.remove("active");
+      renderedBox.style.display = "none";
+      rawBox.style.display = "block";
+    });
+  }
+
+  // Copy button
+  if (btnCopy) {
+    btnCopy.addEventListener("click", () => {
+      if (!currentMissionReportMarkdown) return;
+      const copySuccess = () => {
+        btnCopy.innerText = "✓ Copied!";
+        setTimeout(() => { btnCopy.innerText = "📋 Copy"; }, 2000);
+      };
+
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(currentMissionReportMarkdown)
+          .then(copySuccess)
+          .catch(() => fallbackCopy(currentMissionReportMarkdown, copySuccess));
+      } else {
+        fallbackCopy(currentMissionReportMarkdown, copySuccess);
+      }
+    });
+  }
+}
+
+function fallbackCopy(text, cb) {
+  const ta = document.createElement("textarea");
+  ta.value = text;
+  ta.style.position = "fixed";
+  ta.style.left = "-9999px";
+  document.body.appendChild(ta);
+  ta.select();
+  try {
+    document.execCommand("copy");
+    if (cb) cb();
+  } catch (_) {}
+  document.body.removeChild(ta);
+}
+
+// Enhance markdown table status cells and severity badges
+function enhanceReportBadges(html) {
+  if (!html) return "";
+  return html
+    .replace(/\b(VALID|ONLINE|100% RECOVERED|HEALTHY|BALANCED|VERIFIED|UNCORRUPTED)\b/g, '<span class="badge valid">$1</span>')
+    .replace(/\b(CORRUPT|BIT-ROT|CORRUPTED|BIT ROT)\b/g, '<span class="badge corrupt">$1</span>')
+    .replace(/\b(SUNKEN|LOST|ATTRITION)\b/g, '<span class="badge sunken">$1</span>')
+    .replace(/\b(CRITICAL_HAZARD|CRITICAL ANOMALY|CRITICAL)\b/g, '<span class="badge critical">$1</span>')
+    .replace(/\b(HIGH_HAZARD|HIGH)\b/g, '<span class="badge high">$1</span>')
+    .replace(/\b(MODERATE_WARNING|MEDIUM|MODERATE)\b/g, '<span class="badge medium">$1</span>');
+}
+
+// Standalone fallback markdown parser for offline / CDN failure
+function fallbackParseMarkdown(md) {
+  if (!md) return "";
+  const lines = md.split("\n");
+  let html = "";
+  let inTable = false;
+  let tableRows = [];
+  let inCodeBlock = false;
+  let codeBlockContent = [];
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+
+    // Code blocks ```
+    if (line.trim().startsWith("```")) {
+      if (inCodeBlock) {
+        html += `<pre><code>${escapeHtml(codeBlockContent.join("\n"))}</code></pre>`;
+        codeBlockContent = [];
+        inCodeBlock = false;
+      } else {
+        inCodeBlock = true;
+        codeBlockContent = [];
+      }
+      continue;
+    }
+    if (inCodeBlock) {
+      codeBlockContent.push(line);
+      continue;
+    }
+
+    // Tables | ... |
+    if (line.trim().startsWith("|") && line.trim().endsWith("|")) {
+      if (/^\|[\s\-:\|]+\|$/.test(line.trim())) {
+        continue;
+      }
+      if (!inTable) {
+        inTable = true;
+        tableRows = [];
+      }
+      tableRows.push(line);
+      continue;
+    } else if (inTable) {
+      html += renderTableHtml(tableRows);
+      inTable = false;
+      tableRows = [];
+    }
+
+    // Headers & block elements
+    if (line.startsWith("### ")) {
+      html += `<h3>${formatInlineMd(line.substring(4))}</h3>`;
+    } else if (line.startsWith("## ")) {
+      html += `<h2>${formatInlineMd(line.substring(3))}</h2>`;
+    } else if (line.startsWith("# ")) {
+      html += `<h1>${formatInlineMd(line.substring(2))}</h1>`;
+    } else if (line.startsWith("> ")) {
+      html += `<blockquote>${formatInlineMd(line.substring(2))}</blockquote>`;
+    } else if (line.trim().startsWith("- ") || line.trim().startsWith("* ")) {
+      html += `<ul><li>${formatInlineMd(line.trim().substring(2))}</li></ul>`;
+    } else if (line.trim() === "---") {
+      html += `<hr style="border:none; border-top:1px solid rgba(34,211,238,0.2); margin:14px 0;">`;
+    } else if (line.trim().length > 0) {
+      html += `<p>${formatInlineMd(line)}</p>`;
+    }
+  }
+
+  if (inTable && tableRows.length > 0) {
+    html += renderTableHtml(tableRows);
+  }
+  if (inCodeBlock && codeBlockContent.length > 0) {
+    html += `<pre><code>${escapeHtml(codeBlockContent.join("\n"))}</code></pre>`;
+  }
+
+  return html;
+}
+
+function renderTableHtml(rows) {
+  if (!rows || rows.length === 0) return "";
+  let html = "<table>";
+  for (let i = 0; i < rows.length; i++) {
+    const cells = rows[i].split("|").slice(1, -1);
+    html += "<tr>";
+    const tag = (i === 0) ? "th" : "td";
+    for (const cell of cells) {
+      html += `<${tag}>${formatInlineMd(cell.trim())}</${tag}>`;
+    }
+    html += "</tr>";
+  }
+  html += "</table>";
+  return html;
+}
+
+function formatInlineMd(str) {
+  return str
+    .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
+    .replace(/\*(.*?)\*/g, "<em>$1</em>")
+    .replace(/`([^`]+)`/g, "<code>$1</code>");
+}
+
+function escapeHtml(str) {
+  return String(str)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
+
+// Global exports
+window.openMissionReportModal = openMissionReportModal;
+window.closeMissionReportModal = closeMissionReportModal;

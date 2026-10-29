@@ -130,20 +130,20 @@ def root(request: Request):
 
 
 # Mount 3D Visualizer Static Assets
-if os.path.exists("web3d"):
-    app.mount("/3d", StaticFiles(directory="web3d", html=True), name="web3d")
-    # Also mount static assets for root HTML resolution
-    app.mount("/static", StaticFiles(directory="web3d"), name="static")
+web3d_dir = os.path.join(os.path.dirname(__file__), "web3d")
+if os.path.exists(web3d_dir):
+    app.mount("/3d", StaticFiles(directory=web3d_dir, html=True), name="web3d")
+    app.mount("/static", StaticFiles(directory=web3d_dir), name="static")
 
 
 
 @app.get("/style.css")
 def get_root_css():
-    return FileResponse("web3d/style.css")
+    return FileResponse(os.path.join(web3d_dir, "style.css"))
 
 @app.get("/nautilus_3d.js")
 def get_root_js():
-    return FileResponse("web3d/nautilus_3d.js")
+    return FileResponse(os.path.join(web3d_dir, "nautilus_3d.js"))
 
 @app.get("/api/health")
 def health_check():
